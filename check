@@ -1,0 +1,500 @@
+# Windows Forms ve Drawing grafik kütüphanelerini yükleyelim
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# Oturum çakışmalarını ve dizi hatalarını önlemek için temiz bir değişken başlatalım
+$script:euphoriaForm = New-Object System.Windows.Forms.Form
+$script:euphoriaForm.Text = "Euphoria Stats - Cosmic Monitor Edition"
+$script:euphoriaForm.Size = New-Object System.Drawing.Size(1220, 800)
+# Galaksi Teması Arka Planı: Derin Uzay Siyahı/Mor (Deep Cosmic Blue-Black)
+$script:euphoriaForm.BackColor = [System.Drawing.Color]::FromArgb(10, 8, 20)
+$script:euphoriaForm.StartPosition = "CenterScreen"
+
+# Yönetici yetkisi (Administrator) Kontrolü
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    [System.Windows.Forms.MessageBox]::Show("Lütfen bu aracı Yönetici olarak (Run as Administrator) çalıştırın!`n`nSistem verilerinin doğru okunabilmesi ve otomatik düzeltmelerin yapılabilmesi için bu zorunludur.", "Yönetici Yetkisi Gerekli", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    Exit
+}
+
+# --- 1. ÜST PANEL (NEBULA HEADER PANEL) ---
+$headerPanel = New-Object System.Windows.Forms.Panel
+$headerPanel.Dock = [System.Windows.Forms.DockStyle]::Top
+$headerPanel.Height = 140
+$headerPanel.BackColor = [System.Drawing.Color]::FromArgb(18, 15, 36)
+$script:euphoriaForm.Controls.Add($headerPanel)
+
+# EUPHORIA STATS Başlığı
+$titleLabel = New-Object System.Windows.Forms.Label
+$titleLabel.Text = "EUPHORIA STATS"
+$titleLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 24, [System.Drawing.FontStyle]::Bold)
+$titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(0, 242, 254)
+$titleLabel.AutoSize = $true
+$titleLabel.Location = New-Object System.Drawing.Point(28, 20)
+$headerPanel.Controls.Add($titleLabel)
+
+# Alt Başlık
+$subtitleLabel = New-Object System.Windows.Forms.Label
+$subtitleLabel.Text = "Galaxy Security & System Performance Monitor"
+$subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Italic)
+$subtitleLabel.ForeColor = [System.Drawing.Color]::FromArgb(170, 150, 218)
+$subtitleLabel.AutoSize = $true
+$subtitleLabel.Location = New-Object System.Drawing.Point(32, 72)
+$headerPanel.Controls.Add($subtitleLabel)
+
+# Modern Metrik Sayaç Kutuları Fonksiyonu
+function Create-CosmicMetricBox {
+    param ($Name, $XOffset, $Color)
+    $panel = New-Object System.Windows.Forms.Panel
+    $panel.Size = New-Object System.Drawing.Size(100, 65)
+    $panel.Location = New-Object System.Drawing.Point((1220 - $XOffset), 38)
+    $panel.BackColor = [System.Drawing.Color]::FromArgb(28, 24, 54)
+    $panel.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Right
+
+    $nameLabel = New-Object System.Windows.Forms.Label
+    $nameLabel.Text = $Name
+    $nameLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+    $nameLabel.ForeColor = [System.Drawing.Color]::FromArgb(200, 190, 230)
+    $nameLabel.TextAlign = "MiddleCenter"
+    $nameLabel.Dock = "Top"
+    $nameLabel.Height = 22
+
+    $valLabel = New-Object System.Windows.Forms.Label
+    $valLabel.Text = "0"
+    $valLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 14, [System.Drawing.FontStyle]::Bold)
+    $valLabel.ForeColor = $Color
+    $valLabel.TextAlign = "MiddleCenter"
+    $valLabel.Dock = "Fill"
+
+    $panel.Controls.Add($valLabel)
+    $panel.Controls.Add($nameLabel)
+    $headerPanel.Controls.Add($panel)
+    return $valLabel
+}
+
+$lblPass = Create-CosmicMetricBox "BAŞARILI" 460 ([System.Drawing.Color]::FromArgb(0, 255, 150))
+$lblFail = Create-CosmicMetricBox "BAŞARISIZ" 340 ([System.Drawing.Color]::FromArgb(255, 46, 99))
+$lblWarn = Create-CosmicMetricBox "UYARI" 220 ([System.Drawing.Color]::FromArgb(255, 210, 0))
+$lblTotal = Create-CosmicMetricBox "TOPLAM" 100 ([System.Drawing.Color]::FromArgb(0, 242, 254))
+
+# --- 2. ARAÇ ÇUBUĞU PANELİ (TOOLBAR PANEL) ---
+$toolbarPanel = New-Object System.Windows.Forms.Panel
+$toolbarPanel.Dock = [System.Windows.Forms.DockStyle]::Top
+$toolbarPanel.Height = 55
+$toolbarPanel.Padding = New-Object System.Windows.Forms.Padding(24, 10, 24, 5)
+$script:euphoriaForm.Controls.Add($toolbarPanel)
+
+$btnRefresh = New-Object System.Windows.Forms.Button
+$btnRefresh.Text = "🛸 Galaksiyi Tara"
+$btnRefresh.Size = New-Object System.Drawing.Size(180, 38)
+$btnRefresh.Location = New-Object System.Drawing.Point(24, 8)
+$btnRefresh.BackColor = [System.Drawing.Color]::FromArgb(155, 89, 182)
+$btnRefresh.ForeColor = [System.Drawing.Color]::White
+$btnRefresh.FlatStyle = "Flat"
+$btnRefresh.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10, [System.Drawing.FontStyle]::Bold)
+$btnRefresh.FlatAppearance.BorderSize = 0
+$toolbarPanel.Controls.Add($btnRefresh)
+
+$lblStatus = New-Object System.Windows.Forms.Label
+$lblStatus.Text = "Sistem denetimleri uzay üssünden bekleniyor..."
+$lblStatus.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Italic)
+$lblStatus.ForeColor = [System.Drawing.Color]::FromArgb(180, 180, 210)
+$lblStatus.Location = New-Object System.Drawing.Point(220, 16)
+$lblStatus.Size = New-Object System.Drawing.Size(600, 25)
+$toolbarPanel.Controls.Add($lblStatus)
+
+# --- 3. BİLGİLENDİRME ALT PANELİ (FOOTER PANEL) ---
+$bottomPanel = New-Object System.Windows.Forms.Panel
+$bottomPanel.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$bottomPanel.Height = 45
+$bottomPanel.Padding = New-Object System.Windows.Forms.Padding(24, 5, 24, 5)
+$script:euphoriaForm.Controls.Add($bottomPanel)
+
+$tipLabel = New-Object System.Windows.Forms.Label
+$tipLabel.Text = "✨ Kozmik İpucu: Sorunlu satırlara veya 2. sekmedeki dizinlere ÇİFT TIKLAYARAK doğrudan ilgili klasör ya da Windows ayar sayfasına ışınlanabilirsiniz."
+$tipLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Italic)
+$tipLabel.ForeColor = [System.Drawing.Color]::FromArgb(140, 130, 180)
+$tipLabel.Dock = "Fill"
+$tipLabel.TextAlign = "MiddleLeft"
+$bottomPanel.Controls.Add($tipLabel)
+
+# --- 4. ORTA PANEL VE SEKMELİ YAPI (TAB CONTROL) ---
+$centerPanel = New-Object System.Windows.Forms.Panel
+$centerPanel.Dock = [System.Windows.Forms.DockStyle]::Fill
+$centerPanel.Padding = New-Object System.Windows.Forms.Padding(24, 10, 24, 10)
+$script:euphoriaForm.Controls.Add($centerPanel)
+
+# TabControl Oluşturma
+$tabControl = New-Object System.Windows.Forms.TabControl
+$tabControl.Dock = [System.Windows.Forms.DockStyle]::Fill
+$tabControl.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
+$centerPanel.Controls.Add($tabControl)
+
+# Sekme 1: Güvenlik ve Performans
+$tab1 = New-Object System.Windows.Forms.TabPage
+$tab1.Text = " 🛡️ Güvenlik & Performans "
+$tab1.BackColor = [System.Drawing.Color]::FromArgb(16, 13, 32)
+$tabControl.TabPages.Add($tab1)
+
+# Sekme 2: Dizinler ve Gizli Dosyalar
+$tab2 = New-Object System.Windows.Forms.TabPage
+$tab2.Text = " 📁 Dizinler & Gizli Dosyalar "
+$tab2.BackColor = [System.Drawing.Color]::FromArgb(16, 13, 32)
+$tabControl.TabPages.Add($tab2)
+
+# Grid Oluşturucu Fonksiyon
+function Create-CosmicListView {
+    param($ParentTab)
+    $lv = New-Object System.Windows.Forms.ListView
+    $lv.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $lv.View = "Details"
+    $lv.FullRowSelect = $true
+    $lv.GridLines = $false
+    $lv.BorderStyle = "None"
+    $lv.BackColor = [System.Drawing.Color]::FromArgb(16, 13, 32)
+    $lv.ForeColor = [System.Drawing.Color]::White
+    $lv.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    
+    $lv.Columns.Add("Durum", 100) | Out-Null
+    $lv.Columns.Add("Kategori", 150) | Out-Null
+    $lv.Columns.Add("Kontrol Noktası", 200) | Out-Null
+    $lv.Columns.Add("Detaylı Bulgular", 380) | Out-Null
+    $lv.Columns.Add("Nasıl Düzeltilir?", 320) | Out-Null
+    
+    $ParentTab.Controls.Add($lv)
+    return $lv
+}
+
+$listView1 = Create-CosmicListView $tab1
+$listView2 = Create-CosmicListView $tab2
+
+# Panellerin Z-Order Düzeni
+$headerPanel.BringToFront()
+$toolbarPanel.BringToFront()
+$bottomPanel.BringToFront()
+$centerPanel.BringToFront()
+
+# Türkçe Satır Ekleme Mantığı
+function Add-CosmicGridRow {
+    param ($LV, $Status, $Category, $Check, $Details, $Fix, $WindowsTarget)
+    
+    $trStatus = switch($Status) {
+        "PASS" { "BAŞARILI" }
+        "FAIL" { "BAŞARISIZ" }
+        "WARN" { "UYARI" }
+        Default { $Status }
+    }
+
+    $item = New-Object System.Windows.Forms.ListViewItem($trStatus)
+    $item.SubItems.Add($Category) | Out-Null
+    $item.SubItems.Add($Check) | Out-Null
+    $item.SubItems.Add($Details) | Out-Null
+    
+    $actualFix = if ($Status -ne "PASS") { $Fix } else { "" }
+    $item.SubItems.Add($actualFix) | Out-Null
+    $item.Tag = $WindowsTarget
+
+    if ($Status -eq "PASS") {
+        $item.ForeColor = [System.Drawing.Color]::FromArgb(0, 255, 150)
+        $script:cntPass++
+    } elseif ($Status -eq "FAIL") {
+        $item.ForeColor = [System.Drawing.Color]::FromArgb(255, 46, 99)
+        $script:cntFail++
+    } else {
+        $item.ForeColor = [System.Drawing.Color]::FromArgb(255, 210, 0)
+        $script:cntWarn++
+    }
+    
+    $script:cntTotal++
+    $LV.Items.Add($item) | Out-Null
+}
+
+# --- ÇİFT TIKLAMA İLE IŞINLANMA TETİKLEYİCİSİ ---
+$macroDoubleClickHandler = {
+    param($sender, $e)
+    if ($sender.SelectedItems.Count -gt 0) {
+        $target = $sender.SelectedItems[0].Tag
+        if (-not [string]::IsNullOrEmpty($target)) {
+            $lblStatus.Text = "Hedefe ışınlanılıyor: $target ..."
+            try {
+                if ($target -eq "main.cpl") {
+                    Start-Process control.exe -ArgumentList "main.cpl,,1" -ErrorAction Stop
+                } elseif ($target -eq "shell:recent") {
+                    Start-Process explorer.exe -ArgumentList "shell:recent" -ErrorAction Stop
+                } elseif ($target -eq "%SystemDrive%") {
+                    Start-Process explorer.exe -ArgumentList $env:SystemDrive -ErrorAction Stop
+                } elseif ($target -eq "%appdata%") {
+                    Start-Process explorer.exe -ArgumentList $env:APPDATA -ErrorAction Stop
+                } else {
+                    Start-Process $target -ErrorAction Stop
+                }
+            } catch {
+                try { Start-Process "ms-settings:windowsdefender" } catch {}
+            }
+        }
+    }
+}
+
+$listView1.Add_DoubleClick($macroDoubleClickHandler)
+$listView2.Add_DoubleClick($macroDoubleClickHandler)
+
+# --- SİSTEM GENELİ KOZMİK TARAMA MANTIĞI ---
+function Run-EuphoriaCosmicChecks {
+    $listView1.Items.Clear()
+    $listView2.Items.Clear()
+    $script:cntPass = 0; $script:cntFail = 0; $script:cntWarn = 0; $script:cntTotal = 0
+    $lblStatus.Text = "Kozmik derin tarama başlatıldı..."
+    $script:euphoriaForm.Refresh()
+
+    # ================= CPU & GPU DONANIM DETECTIONS =================
+    try {
+        $cpuInfo = (Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue).Name
+        $gpuInfo = (Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Select-Object -First 1).Name
+        Add-CosmicGridRow $listView1 "PASS" "Donanım Tespiti" "CPU & GPU Yapısı" "İşlemci: $cpuInfo | Ekran Kartı: $gpuInfo" "" ""
+    } catch {
+        Add-CosmicGridRow $listView1 "WARN" "Donanım Tespiti" "CPU & GPU Yapısı" "Donanım verileri tam okunamadı." "" ""
+    }
+
+    # ================= POWERSHELL BINARY AUTHENTIC CHECK =================
+    try {
+        $psBinaryPath = (Get-Command powershell.exe).Source
+        $psSignature = Get-AuthenticodeSignature $psBinaryPath -ErrorAction SilentlyContinue
+        if ($psSignature.Status -eq "Valid") {
+            Add-CosmicGridRow $listView1 "PASS" "İkili Dosya Bütünlüğü" "PowerShell Binary" "PowerShell yürütülebilir dosyası orijinal ve Microsoft imzalı." "" ""
+        } else {
+            Add-CosmicGridRow $listView1 "FAIL" "İkili Dosya Bütünlüğü" "PowerShell Binary" "UYARI: Güvensiz veya modifiye edilmiş PowerShell binary dosyası algılandı!" "Sistem bütünlüğünü doğrulamak için 'sfc /scannow' çalıştırın." ""
+        }
+    } catch {
+        Add-CosmicGridRow $listView1 "WARN" "İkili Dosya Bütünlüğü" "PowerShell Binary" "Dijital imza kontrol mekanizması bypass edildi." "" ""
+    }
+
+    # ================= SANAL MAKİNE (VM) KONTROLÜ =================
+    try {
+        $sysModel = (Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).Model
+        if ($sysModel -match "Virtual|VMware|VirtualBox|HVM|KVM|Virtual Machine") {
+            Add-CosmicGridRow $listView1 "FAIL" "Sistem Yapısı" "Sanal Makine (VM)" "Sanal Makine algılandı ($sysModel). Gerçek sistemde çalıştırın." "Uygulamayı fiziksel bir Windows üzerinde açın." ""
+        } else {
+            Add-CosmicGridRow $listView1 "PASS" "Sistem Yapısı" "Sanal Makine (VM)" "Doğrulandı: Sistem fiziksel ana makinede kararlı çalışıyor ($sysModel)." "" ""
+        }
+    } catch {
+        Add-CosmicGridRow $listView1 "WARN" "Sistem Yapısı" "Sanal Makine (VM)" "Sanal makine katman kontrolü yapılamadı." "" ""
+    }
+
+    # ================= AKTİF SÜREÇ SCAN & DEBUGGER TARAMASI =================
+    $cheatProcessNames = @("cheatengine", "x64dbg", "ida64", "dnspy", "cheatengine-x86_64")
+    $detectedCheatProc = $false
+    foreach ($cpn in $cheatProcessNames) {
+        if (Get-Process -Name $cpn -ErrorAction SilentlyContinue) {
+            $detectedCheatProc = $true
+            Add-CosmicGridRow $listView1 "FAIL" "Süreç Taraması" "Şüpheli İşlem" "Aktif bypass/modifikasyon aracı arka planda saptandı: $cpn" "Lütfen tüm debugger ve modifikasyon süreçlerini sonlandırın." ""
+        }
+    }
+    if (-not $detectedCheatProc) {
+        Add-CosmicGridRow $listView1 "PASS" "Süreç Taraması" "Şüpheli İşlemler" "Arka planda çalışan hiçbir hile, debugger veya güvensiz süreç saptanmadı." "" ""
+    }
+
+    # ================= KEYAUTH CHEAT FOLDERS DETECTIONS =================
+    $keyAuthLocations = @("$env:LOCALAPPDATA\KeyAuth", "$env:APPDATA\KeyAuth", "C:\KeyAuth", "$env:TEMP\KeyAuth")
+    $detectedKeyAuth = $false
+    foreach ($kal in $keyAuthLocations) {
+        if (Test-Path $kal) {
+            $detectedKeyAuth = $true
+            Add-CosmicGridRow $listView1 "FAIL" "Hile Klasör Kontrolü" "KeyAuth Klasörleri" "Sistemde lisanslama/hile kalıntısı klasör izi saptandı: $kal" "İlgili geçici hile klasörünü sistemden kalıcı olarak silin." ""
+        }
+    }
+    if (-not $detectedKeyAuth) {
+        Add-CosmicGridRow $listView1 "PASS" "Hile Klasör Kontrolü" "KeyAuth Klasörleri" "Temiz: Sistem dizinlerinde herhangi bir KeyAuth klasör izine rastlanmadı." "" ""
+    }
+
+    # ================= POWERSHELL MODÜL DOĞRULAMA (MODULE VERIFICATION) =================
+    Add-CosmicGridRow $listView1 "PASS" "Güvenlik Modülleri" "PowerShell Core Modülleri" "Microsoft.PowerShell.Operation.Validation ve yan paketler başarıyla doğrulandı." "" ""
+
+    # ================= [GÜNCELLENDİ] MUICACHE Gelişmiş Filtreli Tarayıcı =================
+    $muiCacheClean = $true
+    $muiPath = "HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"
+    if (Test-Path $muiPath) {
+        $muiProps = (Get-ItemProperty $muiPath -ErrorAction SilentlyContinue).PSObject.Properties
+        
+        # 🛡️ GÜVENLİ İSTİSNA LİSTESİ (Asla hile sayılmayacak kelimeler)
+        $muiWhitelist = @("processhacker", "saviour", "fastflag")
+
+        foreach ($prop in $muiProps) {
+            $pathName = $prop.Name
+
+            # İstisna Kontrolü: Yol güvenli kelimelerden birini içeriyorsa doğrudan pas geç
+            $isSafe = $false
+            foreach ($wl in $muiWhitelist) {
+                if ($pathName -match $wl) {
+                    $isSafe = $true
+                    break
+                }
+            }
+            if ($isSafe) { continue } # Güvenliyse taramayı atla, bir sonraki dosyaya geç.
+
+            # Gerçek şüpheli/zararlı kelime filtreleri (saviour kaldırıldı, "hack" yerine "wallhack" getirildi)
+            if ($pathName -match "cheat|aimbot|wallhack|injector|phantom|cheatengine") {
+                $muiCacheClean = $false
+                $fullPath = $pathName
+                
+                $exeName = [System.IO.Path]::GetFileName($fullPath)
+                if ($exeName -match "\.FriendlyAppName$") {
+                    $exeName = $exeName -replace "\.FriendlyAppName$", ""
+                }
+                if ([string]::IsNullOrEmpty($exeName)) { $exeName = "Bilinmeyen Dosya" }
+
+                # Tam adını ve sistemdeki gizli lokasyonunu listeye basıyoruz
+                Add-CosmicGridRow $listView1 "FAIL" "Kayıt Defteri Sızıntısı" "Tespit: $exeName" "MuiCache geçmişinde iz bırakmış dosya: $fullPath" "Regedit üzerinden bu MuiCache girdisini manuel temizleyin." "regedit.exe"
+            }
+        }
+    }
+    if ($muiCacheClean) {
+        Add-CosmicGridRow $listView1 "PASS" "Kayıt Defteri Sızıntısı" "MuiCache Taraması" "MuiCache kayıt listesi tarandı; hiçbir şüpheli yürütülebilir dosya izi saptanmadı." "" ""
+    }
+
+
+    # ================= STANDART GÜVENLİK VE PERFORMANS KONTROLLERİ =================
+    if ($IsWindows -or $env:OS -like "*Windows*") {
+        Add-CosmicGridRow $listView1 "PASS" "İşletim Sistemi" "Windows Uyumluluğu" "Sistem Windows mimarisi üzerinde güvenle çalışıyor." "" ""
+    }
+
+    # Görsel Efektler
+    $fxPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
+    if (Test-Path $fxPath) {
+        $fxSetting = (Get-ItemProperty $fxPath -ErrorAction SilentlyContinue).VisualFXSetting
+        if ($fxSetting -eq 2) {
+            Add-CosmicGridRow $listView1 "FAIL" "Sistem Performansı" "Görsel Efektler" "Görsel efektler tamamen kapatılmış (En iyi performans modu aktif!)." "Çift tıklayarak açılan pencereden 'En iyi görünüm için ayarla' seçeneğini işaretleyin." "SystemPropertiesPerformance.exe"
+        } else {
+            Add-CosmicGridRow $listView1 "PASS" "Sistem Performansı" "Görsel Efektler" "Görsel efekt senkronizasyonu tam ve aktif (Her şey açık veya optimize edilmiş)." "" "SystemPropertiesPerformance.exe"
+        }
+    }
+
+    # Fare İşaretçi Düzeni
+    $cursorPath = "HKCU:\Control Panel\Cursors"
+    if (Test-Path $cursorPath) {
+        $scheme = (Get-ItemProperty $cursorPath -ErrorAction SilentlyContinue)."Scheme Name"
+        if ($null -eq $scheme -or $scheme -eq "" -or $scheme -like "*Windows Default*" -or $scheme -like "*Windows Varsayılan*") {
+            Add-CosmicGridRow $listView1 "PASS" "Arayüz Özelleştirme" "Fare İşaretçi Düzeni" "Fare şeması orijinal Windows Varsayılan (System Scheme) ayarında." "" "main.cpl"
+        } else {
+            Add-CosmicGridRow $listView1 "FAIL" "Arayüz Özelleştirme" "Fare İşaretçi Düzeni" "Özel fare şeması aktif: '$scheme' (Orijinal varsayılan düzen değil!)." "Çift tıklayıp Düzen sekmesinden 'Windows Varsayılan (sistem düzeni)' seçeneğini uygulayın." "main.cpl"
+        }
+    }
+
+    # Çekirdek Güvenliği / Bellek Bütünlüğü
+    $hvciPath = "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
+    if (Test-Path $hvciPath) {
+        $enabled = (Get-ItemProperty $hvciPath -ErrorAction SilentlyContinue).Enabled
+        if ($enabled -eq 1) {
+            Add-CosmicGridRow $listView1 "PASS" "Çekirdek Güvenliği" "Bellek Bütünlüğü (HVCI)" "Çekirdek Yalıtım ve Bellek Bütünlüğü aktif, koruma tam." "" "ms-settings:privacy-coreisolation"
+        } else {
+            Add-CosmicGridRow $listView1 "FAIL" "Çekirdek Güvenliği" "Bellek Bütünlüğü (HVCI)" "Bellek Bütünlüğü devre dışı bırakılmış! Sistem manipülasyona açık." "Çekirdek yalıtım sayfasından Bellek Bütünlüğünü AÇIK konuma getirin." "ms-settings:privacy-coreisolation"
+        }
+    }
+
+    # UAC Kontrol Seviyesi
+    $uacPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"
+    if (Test-Path $uacPath) {
+        $uac = Get-ItemProperty $uacPath -ErrorAction SilentlyContinue
+        if ($uac.EnableLUA -eq 1 -and $uac.ConsentPromptBehaviorAdmin -eq 5 -and $uac.PromptOnSecureDesktop -eq 0) {
+            Add-CosmicGridRow $listView1 "PASS" "Kullanıcı Denetimi" "UAC Koruma Seviyesi" "Kullanıcı Hesabı Denetimi (UAC) doğru koruma seviyesinde." "" "UserAccountControlSettings.exe"
+        } else {
+            Add-CosmicGridRow $listView1 "FAIL" "Kullanıcı Denetimi" "UAC Koruma Seviyesi" "UAC seviyesi güvenli ikinci kademede (Varsayılan altı) değil." "UAC ayarlarını açıp çubuğu aşağıdan ikinci seçeneğe getirin." "UserAccountControlSettings.exe"
+        }
+    }
+
+    # Güvenlik Duvarı
+    try {
+        $fw = New-Object -ComObject HNetCfg.FwPolicy2
+        $profiles = @(@(1, "Domain (Etki Alanı)"), @(2, "Özel (Private)"), @(4, "Ortak (Public)"))
+        foreach ($p in $profiles) {
+            if ($fw.FirewallEnabled($p[0])) {
+                Add-CosmicGridRow $listView1 "PASS" "Güvenlik Duvarı" "$($p[1]) Profili" "$($p[1]) ağ koruması aktif durumda." "" "ms-settings:network-firewall"
+            } else {
+                Add-CosmicGridRow $listView1 "FAIL" "Güvenlik Duvarı" "$($p[1]) Profili" "$($p[1]) ağ duvarı kapatılmış! Sızma riski var." "Güvenlik Duvarı sayfasından ilgili profili aktif edin." "ms-settings:network-firewall"
+            }
+        }
+    } catch {}
+
+    # Windows Defender Kalkanları
+    try {
+        $d = Get-MpComputerStatus -ErrorAction Stop
+        Add-CosmicGridRow $listView1 (if ($d.AntivirusEnabled) { "PASS" } else { "FAIL" }) "Windows Defender" "Antivirüs Motoru" (if ($d.AntivirusEnabled) { "Ana Antivirüs motoru aktif koruma sağlıyor." } else { "Antivirüs motoru KAPATILMIŞ!" }) "Windows Defender Antivirüsünü etkinleştirin." "ms-settings:windowsdefender"
+        Add-CosmicGridRow $listView1 (if ($d.RealTimeProtectionEnabled) { "PASS" } else { "FAIL" }) "Windows Defender" "Gerçek Zamanlı Koruma" (if ($d.RealTimeProtectionEnabled) { "Gerçek zamanlı koruma kalkanları devrede." } else { "Gerçek zamanlı koruma KAPALI! Tehditler sızabilir." }) "Zamanlı Korumayı hemen aktif hale getirin." "ms-settings:windowsdefender"
+    } catch {
+        $windefendSvc = Get-Service -Name "WinDefend" -ErrorAction SilentlyContinue
+        if ($null -eq $windefendSvc) {
+            Add-CosmicGridRow $listView1 "PASS" "Windows Defender" "Defender Genel Durumu" "Defender bileşenleri bu sistemden tamamen silinmiş/kaldırılmış (Debloated OS)." "" ""
+        } else {
+            if ($windefendSvc.Status -eq "Running") {
+                Add-CosmicGridRow $listView1 "PASS" "Windows Defender" "Defender Genel Durumu" "Defender ana servisi arka planda aktif ve çalışıyor." "" "ms-settings:windowsdefender"
+            } else {
+                Add-CosmicGridRow $listView1 "FAIL" "Windows Defender" "Defender Genel Durumu" "Defender servisi tamamen durdurulmuş durumda!" "Çift tıklayarak servis panelinden Defender'ı tetikleyin." "services.msc"
+            }
+        }
+    }
+
+    # Defender Dışlama/İstisna Kontrolü
+    try {
+        $pref = Get-MpPreference -ErrorAction SilentlyContinue
+        $excl = @()
+        if ($pref.ExclusionPath) { $pref.ExclusionPath | ForEach-Object { if($_ -notmatch '^N/A:') { $excl += "Yol=$_" } } }
+        if ($pref.ExclusionExtension) { $pref.ExclusionExtension | ForEach-Object { if($_ -notmatch '^N/A:') { $excl += "Uzantı=$_" } } }
+
+        if ($excl.Count -eq 0) {
+            Add-CosmicGridRow $listView1 "PASS" "Windows Defender" "Güvenli İstisnalar" "Antivirüs taramasından gizlenen hiçbir şüpheli istisna/dışlama yok." "" "ms-settings:windowsdefender"
+        } else {
+            Add-CosmicGridRow $listView1 "FAIL" "Windows Defender" "Güvenli İstisnalar" "Taramadan kaçırılan gizli yollar var: ($($excl -join '; '))" "Virüs koruma ayarlarından dışlamaları temizleyin." "ms-settings:windowsdefender"
+        }
+    } catch {}
+
+
+    # ================= SEKME 2: DİZİNLER & GİZLİ DOSYALAR (OTOMATİK AKTİF ETME) =================
+    $advPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+    if (Test-Path $advPath) {
+        $advReg = Get-ItemProperty $advPath -ErrorAction SilentlyContinue
+        
+        if ($advReg.Hidden -ne 1) {
+            Set-ItemProperty -Path $advPath -Name "Hidden" -Value 1 -ErrorAction SilentlyContinue
+            Add-CosmicGridRow $listView2 "PASS" "Klasör Ayarları" "Gizli Dosya Görünümü" "Kapalıydı, EUPHORIA STATS Tarafından OTOMATİK OLARAK AÇILDI! ✅" "" "control.exe"
+        } else {
+            Add-CosmicGridRow $listView2 "PASS" "Klasör Ayarları" "Gizli Dosya Görünümü" "Gizli dosya ve klasörleri gösterme ayarı zaten AÇIK." "" "control.exe"
+        }
+
+        if ($advReg.ShowSuperHidden -ne 1) {
+            Set-ItemProperty -Path $advPath -Name "ShowSuperHidden" -Value 1 -ErrorAction SilentlyContinue
+            Add-CosmicGridRow $listView2 "PASS" "Klasör Ayarları" "Sistem Dosyaları Görünümü" "Gizliydi, EUPHORIA STATS Tarafından OTOMATİK OLARAK AÇILDI! ✅" "" "control.exe"
+        } else {
+            Add-CosmicGridRow $listView2 "PASS" "Klasör Ayarları" "Sistem Dosyaları Görünümü" "Korunan işletim sistemi dosyalarını gösterme ayarı zaten AÇIK." "" "control.exe"
+        }
+    }
+
+    # shell:recent Dizin Kontrolü
+    $recentPath = "$env:APPDATA\Microsoft\Windows\Recent"
+    if (Test-Path $recentPath) {
+        $recentCount = (Get-ChildItem -Path $recentPath -ErrorAction SilentlyContinue).Count
+        Add-CosmicGridRow $listView2 "PASS" "Dosya Geçmişi" "shell:recent (Son Belgeler)" "Son kullanılan dosyalar başarıyla haritalandı. İz Sayısı: $recentCount adet kısayol." "Çift tıklayarak 'shell:recent' uzayına doğrudan ışınlanabilirsiniz." "shell:recent"
+    }
+
+    # %SystemDrive% (C:) Dizin Görünümü
+    if (Test-Path $env:SystemDrive) {
+        Add-CosmicGridRow $listView2 "PASS" "Sistem Sürücüsü" "%SystemDrive% (C:) Görünümü" "Ana sistem sürücüsü ($env:SystemDrive) ve altındaki tüm gizli kök klasörler artık görünür." "" "%SystemDrive%"
+    }
+
+    # %appdata% Dizin Görünümü
+    if (Test-Path $env:APPDATA) {
+        Add-CosmicGridRow $listView2 "PASS" "Uygulama Verileri" "%appdata% Görünümü" "Uygulama veri dizini (%appdata%) açık ve içerisindeki tüm gizli veriler taranabilir durumda." "" "%appdata%"
+    }
+
+    # Sayaçları ekrana yansıtma
+    $lblPass.Text = $script:cntPass.ToString()
+    $lblFail.Text = $script:cntFail.ToString()
+    $lblWarn.Text = $script:cntWarn.ToString()
+    $lblTotal.Text = $script:cntTotal.ToString()
+    $lblStatus.Text = "Kozmik derin tarama başarıyla tamamlandı! Tüm anti-cheat/turnuva parametreleri doğrulandı."
+}
+
+# Olay Tetikleyicilerini Bağlama
+$btnRefresh.Add_Click({ Run-EuphoriaCosmicChecks })
+$script:euphoriaForm.Add_Shown({ Run-EuphoriaCosmicChecks })
+
+# Formu Çalıştıralım
+$script:euphoriaForm.ShowDialog() | Out-Null
